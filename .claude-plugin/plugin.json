@@ -2,5 +2,6 @@
   "name": "context-stats",
   "version": "0.1.0",
   "description": "Context size, payload bytes and request counts for the main agent and each subagent",
-  "author": { "name": "Fahim Bagar" }
+  "author": { "name": "Fahim Bagar" },
+  "types": "./types/index.d.ts"
 }
