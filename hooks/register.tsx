@@ -97,6 +97,23 @@ export const register: Register = on => {
     return completed
   })
 
+  // /clear starts a new conversation in the same process: start counting again.
+  on('session.end', async ($, e, next) => {
+    const ended = await next(e)
+
+    if (e.reason === 'clear') {
+      await guard($, 'session.end', async () => {
+        await update($, main, () => EMPTY_MAIN)
+        await update($, runs, () => ({}))
+        await update($, usage, () => null)
+        await update($, pendingTools, () => [])
+        $.ui.status(undefined)
+      })
+    }
+
+    return ended
+  })
+
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const stats = await read($, main)
 
