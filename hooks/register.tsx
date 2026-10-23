@@ -56,6 +56,8 @@ export const register: Register = on => {
     return response
   })
 
+  // The .catch hands back the settled call through next(e), so a failure in
+  // this hook never reruns or blocks the tool.
   on('tool.call', async ($, e, next) => {
     const called = await next(e)
 
@@ -68,7 +70,7 @@ export const register: Register = on => {
     }
 
     return called
-  })
+  }).catch(($, e, next) => next(e))
 
   on('prompt.compose', async ($, e, next) => {
     const composed = await next(e)
