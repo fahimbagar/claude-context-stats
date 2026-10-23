@@ -91,6 +91,7 @@ export const register: Register = on => {
 
       if (agentId === undefined) {
         await refreshStatus($)
+        await appendLog($)
       }
     })
 
@@ -195,6 +196,43 @@ async function refreshStatus($: EngineInterface): Promise<void> {
 
   await update($, usage, () => snapshot)
   $.ui.status(mainLine(await read($, main), snapshot))
+}
+
+// Opt-in: a line is written only when the file already exists.
+async function appendLog($: EngineInterface): Promise<void> {
+  const path = await logPath($)
+
+  if (path === null || !(await $.fs.exists(path))) {
+    return
+  }
+
+  const line = JSON.stringify({
+    at: new Date(await $.clock.now()).toISOString(),
+    sessionId: await $.session.id(),
+    main: await read($, main),
+    usage: await read($, usage),
+    runs: await read($, runs),
+  })
+  // $.fs has no append. tee -a opens the file O_APPEND, so lines from two
+  // sessions sharing the log don't overwrite each other.
+  const appended = await $.process.run(['tee', '-a', path], { stdin: `${line}\n` })
+
+  if (appended.exitCode !== 0) {
+    throw new Error(`tee -a ${path} exited ${appended.exitCode}: ${appended.stderr}`)
+  }
+}
+
+// Beside Claude Code's own config: CLAUDE_CONFIG_DIR when set, else ~/.claude.
+async function logPath($: EngineInterface): Promise<string | null> {
+  const configDir = await $.env.get('CLAUDE_CONFIG_DIR')
+
+  if (configDir !== undefined && configDir !== '') {
+    return `${configDir}/context-stats.jsonl`
+  }
+
+  const home = await $.env.get('HOME')
+
+  return home === undefined ? null : `${home}/.claude/context-stats.jsonl`
 }
 
 // The stats are a side view. A failure is logged to the debug log and never
