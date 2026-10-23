@@ -1,5 +1,6 @@
 {
   "name": "context-stats",
   "owner": { "name": "Fahim Bagar" },
+  "description": "Context size, payload bytes and request counts in Claude Code",
   "plugins": [{ "name": "context-stats", "source": "./" }]
 }
