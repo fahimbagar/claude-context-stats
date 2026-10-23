@@ -39,6 +39,7 @@ declare module 'claude-code' {
       main: MainStats
       runs: Record<string, Run>
       usage: UsageSnapshot | null
+      isExpanded: boolean
     }
   }
 }

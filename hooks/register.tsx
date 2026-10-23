@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, ModelUsage, Register } from 'claude-code'
 
 import type { UsageSnapshot } from '../types'
-import { mainLine } from './format'
+import { bandLines, mainLine } from './format'
 import {
   EMPTY_MAIN,
   applyConversation,
@@ -16,6 +16,7 @@ import {
 const main = atom({ plugin: 'context-stats', key: 'main' } as const, EMPTY_MAIN)
 const runs = atom({ plugin: 'context-stats', key: 'runs' } as const, {})
 const usage = atom({ plugin: 'context-stats', key: 'usage' } as const, null)
+const isExpanded = atom({ plugin: 'context-stats', key: 'isExpanded' } as const, false)
 
 export const register: Register = on => {
   on('turn.start', async ($, e, next) => {
@@ -74,6 +75,34 @@ export const register: Register = on => {
     })
 
     return completed
+  })
+
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    const stats = await read($, main)
+
+    if (e.props.hasSurvey || stats.reqs === 0) {
+      return next(e)
+    }
+
+    const expanded = await read($, isExpanded)
+    const lines = bandLines(stats, await read($, runs), await read($, usage), expanded)
+    const { Box, Button, Text } = $.ui.resolve(e)
+
+    return (
+      <Box flexDirection="column">
+        {lines.map(line => (
+          <Text wrap="truncate-end">{line}</Text>
+        ))}
+        <Button
+          key="toggle"
+          hotkey="s"
+          plain
+          dimColor
+          label={expanded ? 'collapse' : 'expand'}
+          onPress={() => update($, isExpanded, value => !value)}
+        />
+      </Box>
+    )
   })
 }
 
