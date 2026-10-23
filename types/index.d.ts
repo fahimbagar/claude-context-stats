@@ -5,8 +5,15 @@ export type MainStats = {
   growthSum: number
   growthCount: number
   growthMax: number
+  // The tool with the largest result among those run just before the max step.
+  growthMaxTool: string | null
   systemBytes: number | null
   msgsBytes: number | null
+}
+
+export type ToolResultSize = {
+  tool: string
+  bytes: number
 }
 
 export type Run = {
@@ -38,6 +45,8 @@ declare module 'claude-code' {
     'context-stats': {
       main: MainStats
       runs: Record<string, Run>
+      // Main-loop tool results since the last main request.
+      pendingTools: ToolResultSize[]
       usage: UsageSnapshot | null
       isExpanded: boolean
     }

@@ -16,6 +16,7 @@ import {
 const main = atom({ plugin: 'context-stats', key: 'main' } as const, EMPTY_MAIN)
 const runs = atom({ plugin: 'context-stats', key: 'runs' } as const, {})
 const usage = atom({ plugin: 'context-stats', key: 'usage' } as const, null)
+const pendingTools = atom({ plugin: 'context-stats', key: 'pendingTools' } as const, [])
 const isExpanded = atom({ plugin: 'context-stats', key: 'isExpanded' } as const, false)
 
 export const register: Register = on => {
@@ -39,7 +40,12 @@ export const register: Register = on => {
     if (stepUsage !== null) {
       await guard($, 'turn.step', async () => {
         if (agentId === undefined) {
-          await update($, main, m => recordMainRequest(m, contextTokens(stepUsage)))
+          const toolResults = await read($, pendingTools)
+
+          await update($, main, m =>
+            recordMainRequest(m, contextTokens(stepUsage), toolResults),
+          )
+          await update($, pendingTools, () => [])
           await refreshStatus($)
         } else {
           await recordRun($, agentId, stepUsage)
@@ -48,6 +54,20 @@ export const register: Register = on => {
     }
 
     return response
+  })
+
+  on('tool.call', async ($, e, next) => {
+    const called = await next(e)
+
+    if (e.agentId === undefined && called.deny === undefined) {
+      await guard($, 'tool.call', () => {
+        const bytes = utf8Bytes(called.text ?? JSON.stringify(called.result ?? null))
+
+        return update($, pendingTools, results => [...results, { tool: e.tool, bytes }])
+      })
+    }
+
+    return called
   })
 
   on('prompt.compose', async ($, e, next) => {

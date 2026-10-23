@@ -1,6 +1,6 @@
 import type { AgentInfo, ModelUsage, SessionMessage } from 'claude-code'
 
-import type { MainStats, Run } from '../types'
+import type { MainStats, Run, ToolResultSize } from '../types'
 
 export const EMPTY_MAIN: MainStats = {
   turn: 0,
@@ -9,6 +9,7 @@ export const EMPTY_MAIN: MainStats = {
   growthSum: 0,
   growthCount: 0,
   growthMax: 0,
+  growthMaxTool: null,
   systemBytes: null,
   msgsBytes: null,
 }
@@ -21,7 +22,11 @@ export function contextTokens(usage: ModelUsage): number {
   )
 }
 
-export function recordMainRequest(main: MainStats, tokens: number): MainStats {
+export function recordMainRequest(
+  main: MainStats,
+  tokens: number,
+  toolResults: readonly ToolResultSize[],
+): MainStats {
   const counted = { ...main, reqs: main.reqs + 1, lastTokens: tokens }
 
   // A smaller context than last time means it was compacted. Restart from
@@ -36,8 +41,25 @@ export function recordMainRequest(main: MainStats, tokens: number): MainStats {
     ...counted,
     growthSum: main.growthSum + growth,
     growthCount: main.growthCount + 1,
-    growthMax: Math.max(main.growthMax, growth),
+    ...(growth > main.growthMax && {
+      growthMax: growth,
+      growthMaxTool: largestTool(toolResults),
+    }),
   }
+}
+
+// Several tools can run in parallel before one request; the largest result
+// is the likeliest cause of the jump.
+function largestTool(toolResults: readonly ToolResultSize[]): string | null {
+  let largest: ToolResultSize | null = null
+
+  for (const result of toolResults) {
+    if (largest === null || result.bytes > largest.bytes) {
+      largest = result
+    }
+  }
+
+  return largest?.tool ?? null
 }
 
 export function utf8Bytes(text: string): number {

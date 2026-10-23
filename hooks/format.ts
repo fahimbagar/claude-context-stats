@@ -26,7 +26,11 @@ function roundForDisplay(value: number): number {
   return value >= 100 ? Math.round(value) : Number(value.toFixed(1))
 }
 
-export function mainLine(main: MainStats, usage: UsageSnapshot | null): string {
+export function mainLine(
+  main: MainStats,
+  usage: UsageSnapshot | null,
+  showMaxTool = false,
+): string {
   const parts = [`tok ${contextPart(usage)}`]
 
   if (main.systemBytes !== null || main.msgsBytes !== null) {
@@ -37,8 +41,10 @@ export function mainLine(main: MainStats, usage: UsageSnapshot | null): string {
 
   if (main.growthCount > 0) {
     const mean = main.growthSum / main.growthCount
+    const maxTool =
+      showMaxTool && main.growthMaxTool !== null ? ` (${main.growthMaxTool})` : ''
     parts.push(
-      `+tok/req mean ${formatTokens(mean)}, max ${formatTokens(main.growthMax)}`,
+      `+tok/req mean ${formatTokens(mean)}, max ${formatTokens(main.growthMax)}${maxTool}`,
     )
   }
 
@@ -73,7 +79,7 @@ export function bandLines(
   usage: UsageSnapshot | null,
   isExpanded: boolean,
 ): string[] {
-  const lines = [mainLine(main, usage)]
+  const lines = [mainLine(main, usage, isExpanded)]
   const all = Object.entries(runs)
     .map(([id, run]) => ({ ...run, id }))
     .sort((a, b) => a.seq - b.seq)
