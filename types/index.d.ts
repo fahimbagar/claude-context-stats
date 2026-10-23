@@ -5,6 +5,8 @@ export type MainStats = {
   growthSum: number
   growthCount: number
   growthMax: number
+  systemBytes: number | null
+  msgsBytes: number | null
 }
 
 export type UsageSnapshot = {

@@ -27,7 +27,13 @@ function roundForDisplay(value: number): number {
 }
 
 export function mainLine(main: MainStats, usage: UsageSnapshot | null): string {
-  const parts = [`tok ${contextPart(usage)}`, `reqs ${main.reqs}`]
+  const parts = [`tok ${contextPart(usage)}`]
+
+  if (main.systemBytes !== null || main.msgsBytes !== null) {
+    parts.push(payloadPart(main.systemBytes, main.msgsBytes))
+  }
+
+  parts.push(`reqs ${main.reqs}`)
 
   if (main.growthCount > 0) {
     const mean = main.growthSum / main.growthCount
@@ -37,6 +43,14 @@ export function mainLine(main: MainStats, usage: UsageSnapshot | null): string {
   }
 
   return `main: ${parts.join(' | ')}`
+}
+
+// "~" because tool schemas and the request's JSON envelope aren't counted.
+function payloadPart(system: number | null, msgs: number | null): string {
+  const total = (system ?? 0) + (msgs ?? 0)
+  const show = (n: number | null) => (n === null ? 'n/a' : formatBytes(n))
+
+  return `payload ~${formatBytes(total)} (system ${show(system)} + msgs ${show(msgs)})`
 }
 
 function contextPart(usage: UsageSnapshot | null): string {

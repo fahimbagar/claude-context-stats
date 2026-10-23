@@ -3,7 +3,7 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { UsageSnapshot } from '../types'
 import { mainLine } from './format'
-import { EMPTY_MAIN, contextTokens, recordMainRequest } from './stats'
+import { EMPTY_MAIN, contextTokens, recordMainRequest, utf8Bytes } from './stats'
 
 const main = atom({ plugin: 'context-stats', key: 'main' } as const, EMPTY_MAIN)
 const usage = atom({ plugin: 'context-stats', key: 'usage' } as const, null)
@@ -33,6 +33,35 @@ export const register: Register = on => {
     }
 
     return response
+  })
+
+  on('prompt.compose', async ($, e, next) => {
+    const composed = await next(e)
+
+    await guard($, 'prompt.compose', () => {
+      const bytes = composed.sections.reduce((sum, s) => sum + utf8Bytes(s.text), 0)
+
+      return update($, main, m => ({ ...m, systemBytes: bytes }))
+    })
+
+    return composed
+  })
+
+  on('turn.complete', async ($, e, next) => {
+    const completed = await next(e)
+
+    if (e.agentId === undefined) {
+      await guard($, 'turn.complete', async () => {
+        // The messages the next request is built from, compaction applied.
+        const messages = await $.session.messages({ as: 'api' })
+        const bytes = utf8Bytes(JSON.stringify(messages))
+
+        await update($, main, m => ({ ...m, msgsBytes: bytes }))
+        await refreshStatus($)
+      })
+    }
+
+    return completed
   })
 }
 

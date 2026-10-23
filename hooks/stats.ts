@@ -9,6 +9,8 @@ export const EMPTY_MAIN: MainStats = {
   growthSum: 0,
   growthCount: 0,
   growthMax: 0,
+  systemBytes: null,
+  msgsBytes: null,
 }
 
 export function contextTokens(usage: ModelUsage): number {
@@ -36,4 +38,8 @@ export function recordMainRequest(main: MainStats, tokens: number): MainStats {
     growthCount: main.growthCount + 1,
     growthMax: Math.max(main.growthMax, growth),
   }
+}
+
+export function utf8Bytes(text: string): number {
+  return new TextEncoder().encode(text).length
 }
