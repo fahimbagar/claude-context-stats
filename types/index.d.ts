@@ -9,6 +9,23 @@ export type MainStats = {
   msgsBytes: number | null
 }
 
+export type Run = {
+  // Order first seen, and the main turn it started in.
+  seq: number
+  turn: number
+  // null while $.agent.list() doesn't know the id: Claude Code's own runs
+  // (compaction, memory) never appear there.
+  type: string | null
+  description: string
+  parentId: string | null
+  reqs: number
+  peakTokens: number
+  tokensIn: number
+  tokensOut: number
+  msgsBytes: number | null
+  returnedBytes: number | null
+}
+
 export type UsageSnapshot = {
   tokens: number | null
   window: number
@@ -20,6 +37,7 @@ declare module 'claude-code' {
   interface PluginState {
     'context-stats': {
       main: MainStats
+      runs: Record<string, Run>
       usage: UsageSnapshot | null
     }
   }

@@ -1,11 +1,20 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register } from 'claude-code'
+import type { EngineInterface, ModelUsage, Register } from 'claude-code'
 
 import type { UsageSnapshot } from '../types'
 import { mainLine } from './format'
-import { EMPTY_MAIN, contextTokens, recordMainRequest, utf8Bytes } from './stats'
+import {
+  EMPTY_MAIN,
+  applyConversation,
+  contextTokens,
+  recordMainRequest,
+  recordRunRequest,
+  returnedBytes,
+  utf8Bytes,
+} from './stats'
 
 const main = atom({ plugin: 'context-stats', key: 'main' } as const, EMPTY_MAIN)
+const runs = atom({ plugin: 'context-stats', key: 'runs' } as const, {})
 const usage = atom({ plugin: 'context-stats', key: 'usage' } as const, null)
 
 export const register: Register = on => {
@@ -24,11 +33,16 @@ export const register: Register = on => {
   on('turn.step', async function* ($, e, next) {
     const response = yield* next(e)
     const stepUsage = response.usage
+    const agentId = e.agentId
 
-    if (e.agentId === undefined && stepUsage !== null) {
+    if (stepUsage !== null) {
       await guard($, 'turn.step', async () => {
-        await update($, main, m => recordMainRequest(m, contextTokens(stepUsage)))
-        await refreshStatus($)
+        if (agentId === undefined) {
+          await update($, main, m => recordMainRequest(m, contextTokens(stepUsage)))
+          await refreshStatus($)
+        } else {
+          await recordRun($, agentId, stepUsage)
+        }
       })
     }
 
@@ -49,20 +63,59 @@ export const register: Register = on => {
 
   on('turn.complete', async ($, e, next) => {
     const completed = await next(e)
+    const agentId = e.agentId
 
-    if (e.agentId === undefined) {
-      await guard($, 'turn.complete', async () => {
-        // The messages the next request is built from, compaction applied.
-        const messages = await $.session.messages({ as: 'api' })
-        const bytes = utf8Bytes(JSON.stringify(messages))
+    await guard($, 'turn.complete', async () => {
+      await measureConversation($, agentId)
 
-        await update($, main, m => ({ ...m, msgsBytes: bytes }))
+      if (agentId === undefined) {
         await refreshStatus($)
-      })
-    }
+      }
+    })
 
     return completed
   })
+}
+
+async function recordRun(
+  $: EngineInterface,
+  agentId: string,
+  stepUsage: ModelUsage,
+): Promise<void> {
+  const known = (await read($, runs))[agentId]
+  // $.agent.list() drops an agent seconds after it ends, so the label is
+  // looked up while the run is still going.
+  const info =
+    known?.type != null
+      ? undefined
+      : (await $.agent.list()).find(agent => agent.id === agentId)
+  const { turn } = await read($, main)
+
+  await update($, runs, all => recordRunRequest(all, agentId, info, turn, stepUsage))
+}
+
+// Measures one conversation (main, or a subagent's) as its next request
+// would carry it, compaction applied, and what its Agent calls got back.
+async function measureConversation(
+  $: EngineInterface,
+  agentId: string | undefined,
+): Promise<void> {
+  const api =
+    agentId === undefined
+      ? await $.session.messages({ as: 'api' })
+      : await $.session.messages({ agentId, as: 'api' })
+  const rows =
+    agentId === undefined
+      ? await $.session.messages()
+      : await $.session.messages({ agentId })
+  const bytes = Array.isArray(api) ? utf8Bytes(JSON.stringify(api)) : null
+  const returned = Array.isArray(rows) ? returnedBytes(rows) : new Map<string, number>()
+
+  if (agentId === undefined) {
+    await update($, main, m => ({ ...m, msgsBytes: bytes }))
+  }
+
+  await update($, runs, all => applyConversation(all, agentId, bytes, returned))
 }
 
 async function refreshStatus($: EngineInterface): Promise<void> {
