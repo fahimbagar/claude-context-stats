@@ -94,3 +94,7 @@ claude plugin test .
 ```
 
 Running `claude --plugin-dir .` once writes the API type definitions to `.claude-plugin/types/`, after which `tsc -p .` type-checks the module.
+
+## Credits
+
+The plugin icon is `chart-bar` from [Tabler Icons](https://tabler.io/icons) 3.50.0, MIT licensed, © 2020-2026 Paweł Kuna. Its license is in `.claude-plugin/icon.LICENSE`.
