@@ -1,5 +1,8 @@
 # context-stats
 
+[![CI](https://github.com/fahimbagar/claude-context-stats/actions/workflows/ci.yml/badge.svg)](https://github.com/fahimbagar/claude-context-stats/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A Claude Code plugin that shows how big each request is: context tokens, approximate payload bytes, request counts and per-request growth for the main agent, its tool calls, and every subagent run. It reads the numbers from Claude Code's plugin hooks as requests happen, so nothing is parsed from transcript files and your `settings.json` is never edited.
 
 ```
