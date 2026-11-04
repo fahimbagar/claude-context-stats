@@ -84,17 +84,27 @@ type IdentifiedRun = Run & { id: string }
 
 const DESCRIPTION_WIDTH = 30
 
+export type Expanded = { tools: boolean; subagents: boolean }
+
+type Row = [label: string, rest: string]
+
 export function bandLines(
   main: MainStats,
   runs: Readonly<Record<string, Run>>,
   tools: readonly ToolTally[],
   usage: UsageSnapshot | null,
-  isExpanded: boolean,
+  expanded: Expanded,
 ): string[] {
   const lines = [mainLine(main, usage)]
 
   if (tools.length > 0) {
     lines.push(toolsLine(main, tools))
+
+    if (expanded.tools) {
+      const now = tools.filter(t => t.turn === main.turn)
+      const earlier = mergeByTool(tools.filter(t => t.turn !== main.turn))
+      lines.push(...nowAndEarlier(now.map(toolRow), earlier.map(toolRow)))
+    }
   }
 
   const all = Object.entries(runs)
@@ -106,16 +116,10 @@ export function bandLines(
   if (subagents.length > 0) {
     lines.push(subagentsLine(subagents))
 
-    // main.turn is the running turn, or the one that just ended while idle.
-    const current = subagents.filter(run => run.turn === main.turn)
-    const earlier = subagents.filter(run => run.turn !== main.turn)
-
-    if (current.length > 0) {
-      lines.push('  now:', ...runLines(current))
-    }
-
-    if (earlier.length > 0) {
-      lines.push('  earlier:', ...(isExpanded ? runLines(earlier) : typeLines(earlier)))
+    if (expanded.subagents) {
+      const now = subagents.filter(run => run.turn === main.turn)
+      const earlier = subagents.filter(run => run.turn !== main.turn)
+      lines.push(...nowAndEarlier(runRows(now), runRows(earlier)))
     }
   }
 
@@ -128,6 +132,19 @@ export function bandLines(
   }
 
   return lines
+}
+
+// "now" is the running turn, or the one that just ended while idle. Labels
+// are padded to one width across both groups so the columns line up.
+function nowAndEarlier(now: readonly Row[], earlier: readonly Row[]): string[] {
+  const width = Math.max(...[...now, ...earlier].map(([label]) => label.length))
+  const render = (rows: readonly Row[]) =>
+    rows.map(([label, rest]) => `${label.padEnd(width)}   ${rest}`)
+
+  return [
+    ...(now.length > 0 ? ['  now:', ...render(now)] : []),
+    ...(earlier.length > 0 ? ['  earlier:', ...render(earlier)] : []),
+  ]
 }
 
 function toolsLine(main: MainStats, tools: readonly ToolTally[]): string {
@@ -154,6 +171,46 @@ function toolsLine(main: MainStats, tools: readonly ToolTally[]): string {
   return parts.join(' | ')
 }
 
+function toolRow(tally: ToolTally): Row {
+  const parts = [
+    `result ${formatBytes(tally.bytes)}`,
+    `largest ${formatBytes(tally.largest)}`,
+  ]
+
+  if (tally.errors > 0) {
+    parts.push(`err ${tally.errors}`)
+  }
+
+  parts.push(`time ${formatDuration(tally.durationMs)}`)
+
+  return [`  ${tally.tool} ×${tally.calls}`, parts.join(' | ')]
+}
+
+// One tally per tool across turns, in the order each tool first ran.
+function mergeByTool(tallies: readonly ToolTally[]): ToolTally[] {
+  const byTool = new Map<string, ToolTally>()
+
+  for (const tally of tallies) {
+    const merged = byTool.get(tally.tool)
+
+    byTool.set(
+      tally.tool,
+      merged === undefined
+        ? tally
+        : {
+            ...merged,
+            calls: merged.calls + tally.calls,
+            bytes: merged.bytes + tally.bytes,
+            largest: Math.max(merged.largest, tally.largest),
+            errors: merged.errors + tally.errors,
+            durationMs: merged.durationMs + tally.durationMs,
+          },
+    )
+  }
+
+  return [...byTool.values()]
+}
+
 function subagentsLine(runs: readonly IdentifiedRun[]): string {
   const ids = new Set(runs.map(run => run.id))
   const toMain = runs.filter(run => run.parentId === null || !ids.has(run.parentId))
@@ -166,8 +223,8 @@ function subagentsLine(runs: readonly IdentifiedRun[]): string {
   ].join(' | ')
 }
 
-// One line per run, children indented under their parent when both are listed.
-function runLines(runs: readonly IdentifiedRun[]): string[] {
+// One row per run, children indented under their parent when both are listed.
+function runRows(runs: readonly IdentifiedRun[]): Row[] {
   const ids = new Set(runs.map(run => run.id))
   const ordered: { run: IdentifiedRun; depth: number }[] = []
   const placed = new Set<string>()
@@ -192,37 +249,15 @@ function runLines(runs: readonly IdentifiedRun[]): string[] {
     }
   }
 
-  const labels = ordered.map(({ run, depth }) => '  '.repeat(depth + 1) + runLabel(run))
-  const width = Math.max(...labels.map(label => label.length))
-
-  return ordered.map(({ run }, i) =>
+  return ordered.map(({ run, depth }) => [
+    '  '.repeat(depth + 1) + runLabel(run),
     [
-      `${labels[i]?.padEnd(width)}   req ${run.reqs}`,
+      `req ${run.reqs}`,
       tokensInOut(run.tokensIn, run.tokensOut),
       `msg ${optionalBytes(run.msgsBytes)}`,
       `returned ${optionalBytes(run.returnedBytes)}`,
     ].join(' | '),
-  )
-}
-
-function typeLines(runs: readonly IdentifiedRun[]): string[] {
-  const byType = new Map<string, IdentifiedRun[]>()
-
-  for (const run of runs) {
-    const type = run.type ?? ''
-    byType.set(type, [...(byType.get(type) ?? []), run])
-  }
-
-  const labels = [...byType].map(([type, group]) => `  ${type} ×${group.length}`)
-  const width = Math.max(...labels.map(label => label.length))
-
-  return [...byType.values()].map((group, i) =>
-    [
-      `${labels[i]?.padEnd(width)}   ${volume(group)}`,
-      `msg ${formatBytes(sum(group, run => run.msgsBytes ?? 0))}`,
-      `returned ${formatBytes(sum(group, run => run.returnedBytes ?? 0))}`,
-    ].join(' | '),
-  )
+  ])
 }
 
 function runLabel(run: Run): string {

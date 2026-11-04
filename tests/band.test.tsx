@@ -1,4 +1,5 @@
 import { expect, test } from 'claude-code/testing'
+import type { On } from 'claude-code'
 import type { Engine } from 'claude-code/testing'
 
 const BAND = {
@@ -41,7 +42,9 @@ async function complete($: Engine, turnId: string, agentId?: string) {
   })
 }
 
-test('the band counts main requests, tool calls and subagent runs', async ($, on) => {
+// Stands in for the engine beneath the plugin. Returns what the plugin sent
+// to $.ui.log, where a guarded failure is reported.
+function stubEngine(on: On): unknown[] {
   // Nothing sits beneath the plugin: these hooks stand for the engine.
   on('turn.start', (_, e) => ({ turnId: e.turnId }))
   // biome-ignore lint/correctness/useYield: a turn.step hook must be a generator; this stub answers with no chunks
@@ -105,13 +108,18 @@ test('the band counts main requests, tool calls and subagent runs', async ($, on
   })
   on('env.get', () => ({ value: undefined }))
   on('fs.exists', () => ({ value: false }))
-  // A guarded failure is reported through $.ui.log; this run should have none.
   const logged: unknown[] = []
   on('ui.log', (_, e) => {
     logged.push(e)
     return { value: undefined }
   })
   on('ui.status', () => ({ value: undefined }))
+
+  return logged
+}
+
+test('the band counts main requests, tool calls and subagent runs', async ($, on) => {
+  const logged = stubEngine(on)
 
   await $.turn.start({ text: 'go', turnId: 'm1' })
   nextTokens.set('', 10_000)
@@ -132,21 +140,48 @@ test('the band counts main requests, tool calls and subagent runs', async ($, on
   expect(logged).toEqual([])
 
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
-  const mainRow = await ui.find({ type: 'Text', text: /^main:/ })
+  const text = async (pattern: RegExp) => (await ui.find({ type: 'Text', text: pattern }))?.text
 
-  expect(mainRow?.text).toBe(
+  expect(await text(/^main:/)).toBe(
     'main: tok 32k/200k (16%) | payload ~57 B (sys n/a + msg 57 B) | req 2 | +tok/req ~20k',
   )
-  expect((await ui.find({ type: 'Text', text: /^tools:/ }))?.text).toBe(
+  expect(await text(/^tools:/)).toBe(
     'tools: 1 call | result 78.1 KB | max +20k (Read) | time 0.1s',
   )
-  expect((await ui.find({ type: 'Text', text: /^subagents:/ }))?.text).toBe(
+  expect(await text(/^subagents:/)).toBe(
     'subagents: 1 run | req 2 | tok 81k in / 200 out | msg 57 B | returned 5 B',
   )
-  expect((await ui.find({ type: 'Text', text: /Explore/ }))?.text).toContain(
-    'req 2 | tok 81k in / 200 out',
-  )
-  expect((await ui.find({ type: 'Text', text: /^session:/ }))?.text).toBe('session: $0.42')
+  expect(await text(/^session:/)).toBe('session: $0.42')
 
+  // Collapsed: summary lines only.
+  expect(await text(/now:/)).toBeUndefined()
+
+  await ui.press({ key: 'tools' })
+  expect(await text(/Read ×1/)).toBe('  Read ×1   result 78.1 KB | largest 78.1 KB | time 0.1s')
+  expect(await text(/Explore/)).toBeUndefined()
+
+  await ui.press({ key: 'subagents' })
+  expect(await text(/Explore/)).toBe(
+    '  Explore "find hook config"   req 2 | tok 81k in / 200 out | msg 57 B | returned 5 B',
+  )
+
+  await ui.press({ key: 'tools' })
+  expect(await text(/Read ×1/)).toBeUndefined()
+  await ui.unmount()
+})
+
+test('the subagents key shows only once a subagent has run', async ($, on) => {
+  stubEngine(on)
+
+  await $.turn.start({ text: 'go', turnId: 'm1' })
+  nextTokens.set('', 10_000)
+  await step($, 'm1', 0)
+  await $.tool.call({ tool: 'Read', file_path: '/big' })
+  await complete($, 'm1')
+
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+
+  expect(await ui.find({ key: 'tools' })).toBeDefined()
+  expect(await ui.find({ key: 'subagents' })).toBeUndefined()
   await ui.unmount()
 })

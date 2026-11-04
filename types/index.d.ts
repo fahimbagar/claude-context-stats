@@ -60,7 +60,8 @@ declare module 'claude-code' {
       pendingTools: ToolResultSize[]
       tools: ToolTally[]
       usage: UsageSnapshot | null
-      isExpanded: boolean
+      toolsExpanded: boolean
+      subagentsExpanded: boolean
     }
   }
 }

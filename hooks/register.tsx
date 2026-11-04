@@ -19,7 +19,14 @@ const runs = atom({ plugin: 'context-stats', key: 'runs' } as const, {})
 const usage = atom({ plugin: 'context-stats', key: 'usage' } as const, null)
 const pendingTools = atom({ plugin: 'context-stats', key: 'pendingTools' } as const, [])
 const tools = atom({ plugin: 'context-stats', key: 'tools' } as const, [])
-const isExpanded = atom({ plugin: 'context-stats', key: 'isExpanded' } as const, false)
+const toolsExpanded = atom(
+  { plugin: 'context-stats', key: 'toolsExpanded' } as const,
+  false,
+)
+const subagentsExpanded = atom(
+  { plugin: 'context-stats', key: 'subagentsExpanded' } as const,
+  false,
+)
 
 export const register: Register = on => {
   on('turn.start', async ($, e, next) => {
@@ -134,29 +141,52 @@ export const register: Register = on => {
       return next(e)
     }
 
-    const expanded = await read($, isExpanded)
-    const lines = bandLines(
-      stats,
-      await read($, runs),
-      await read($, tools),
-      await read($, usage),
-      expanded,
-    )
+    const runList = await read($, runs)
+    const toolList = await read($, tools)
+    const expanded = {
+      tools: await read($, toolsExpanded),
+      subagents: await read($, subagentsExpanded),
+    }
+    const lines = bandLines(stats, runList, toolList, await read($, usage), expanded)
     const { Box, Button, Text } = $.ui.resolve(e)
+    const toggle = (key: string, hotkey: string, isOpen: boolean, onPress: () => void) => (
+      <Button
+        key={key}
+        hotkey={hotkey}
+        plain
+        dimColor
+        label={`${isOpen ? 'collapse' : 'expand'} ${key}`}
+        onPress={onPress}
+      />
+    )
+    // A key only shows when its section has a line to reveal.
+    const toggles = [
+      ...(toolList.length > 0
+        ? [
+            toggle('tools', 't', expanded.tools, () =>
+              update($, toolsExpanded, value => !value),
+            ),
+          ]
+        : []),
+      ...(Object.values(runList).some(run => run.type !== null)
+        ? [
+            toggle('subagents', 's', expanded.subagents, () =>
+              update($, subagentsExpanded, value => !value),
+            ),
+          ]
+        : []),
+    ]
 
     return (
       <Box flexDirection="column">
         {lines.map(line => (
           <Text wrap="truncate-end">{line}</Text>
         ))}
-        <Button
-          key="toggle"
-          hotkey="s"
-          plain
-          dimColor
-          label={expanded ? 'collapse' : 'expand'}
-          onPress={() => update($, isExpanded, value => !value)}
-        />
+        {toggles.length > 0 ? (
+          <Box flexDirection="row" gap={3}>
+            {toggles}
+          </Box>
+        ) : null}
       </Box>
     )
   })
