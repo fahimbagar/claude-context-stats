@@ -157,7 +157,6 @@ function runLines(runs: readonly IdentifiedRun[]): string[] {
   return ordered.map(({ run }, i) =>
     [
       `${labels[i]?.padEnd(width)}   req ${run.reqs}`,
-      `peak tok ${formatTokens(run.peakTokens)}`,
       tokensInOut(run.tokensIn, run.tokensOut),
       `msg ${optionalBytes(run.msgsBytes)}`,
       `returned ${optionalBytes(run.returnedBytes)}`,

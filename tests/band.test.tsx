@@ -135,7 +135,7 @@ test('the band counts main and subagent requests and expands', async ($, on) => 
     'subagents: 1 run | req 2 | tok 81k in / 200 out | msg 57 B | returned 5 B',
   )
   expect((await ui.find({ type: 'Text', text: /Explore/ }))?.text).toContain(
-    'req 2 | peak tok 41k',
+    'req 2 | tok 81k in / 200 out',
   )
   expect((await ui.find({ type: 'Text', text: /^session:/ }))?.text).toBe('session: $0.42')
 
