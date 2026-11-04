@@ -5,6 +5,8 @@
 
 A Claude Code plugin that shows how big each request is: context tokens, approximate payload bytes, request counts and per-request growth for the main agent, its tool calls, and every subagent run. It reads the numbers from Claude Code's plugin hooks as requests happen, so nothing is parsed from transcript files and your `settings.json` is never edited.
 
+![context-stats band updating during a Claude Code session](example.gif)
+
 ```
 main: tok 84.2k/200k (42%) | payload ~342 KB (sys 31 KB + msg 311 KB) | req 31 | +tok/req ~1.7k
 tools: 42 calls | result 1.1 MB | max +20.1k (Read) | err 2 | time 1m12s
