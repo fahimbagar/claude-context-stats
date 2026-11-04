@@ -1,22 +1,36 @@
 # context-stats
 
-A Claude Code plugin that shows how big each request is: context tokens, approximate payload bytes, request counts and per-request growth, for the main agent and for every subagent run. It reads the numbers from Claude Code's plugin hooks as requests happen, so nothing is parsed from transcript files and your `settings.json` is never edited.
+A Claude Code plugin that shows how big each request is: context tokens, approximate payload bytes, request counts and per-request growth for the main agent, its tool calls, and every subagent run. It reads the numbers from Claude Code's plugin hooks as requests happen, so nothing is parsed from transcript files and your `settings.json` is never edited.
 
 ```
-main: tok 84.2k/200k (42%) | payload ~342 KB (system 31 KB + msgs 311 KB) | reqs 31 | +tok/req mean 1.7k, max 20.1k
-subagents: 3 runs | reqs 24 | tok 610k in / 14.2k out | msgs 1.8 MB | returned to main 9.4 KB
-  this turn:
-  Explore "find hook config"   reqs 9 | peak tok 41k | tok 210k in / 4.1k out | msgs 600 KB | returned 2.3 KB
-  earlier:
-  Explore ×1           reqs 7 | tok 200k in / 5.7k out | msgs 600 KB | returned 3.8 KB
-  general-purpose ×1   reqs 8 | tok 210k in / 4.4k out | msgs 600 KB | returned 3.3 KB
+main: tok 84.2k/200k (42%) | payload ~342 KB (sys 31 KB + msg 311 KB) | req 31 | +tok/req ~1.7k
+tools: 42 calls | result 1.1 MB | max +20.1k (Read) | err 2 | time 1m12s
+subagents: 3 runs | req 24 | tok 610k in / 14.2k out | msg 1.8 MB | returned 9.4 KB
 session: $2.31
-s: expand
+t: expand tools   s: expand subagents
+```
+
+Expanded, each section lists the current turn under `now:` and the rest under `earlier:`:
+
+```
+tools: 42 calls | result 1.1 MB | max +20.1k (Read) | err 2 | time 1m12s
+  now:
+  Read ×6    result 180 KB | largest 78 KB | time 0.4s
+  Bash ×3    result 12 KB | largest 9 KB | err 1 | time 8.2s
+  earlier:
+  Read ×18   result 640 KB | largest 120 KB | time 1.1s
+  Grep ×9    result 95 KB | largest 30 KB | time 0.9s
+subagents: 3 runs | req 24 | tok 610k in / 14.2k out | msg 1.8 MB | returned 9.4 KB
+  now:
+  Explore "find hook config"       req 9 | tok 210k in / 4.1k out | msg 600 KB | returned 2.3 KB
+  earlier:
+  Explore "scan transcripts"       req 7 | tok 200k in / 5.7k out | msg 600 KB | returned 3.8 KB
+  general-purpose "draft README"   req 8 | tok 210k in / 4.4k out | msg 600 KB | returned 3.3 KB
 ```
 
 ## Install
 
-Built and tested against Claude Code 2.1.309. The plugin is a mod (a TypeScript hooks module), and that API is early access, so a later Claude Code release may need an update here.
+Built against Claude Code 2.1.309 and tested on 2.1.318. The plugin is a mod (a TypeScript hooks module), and that API is early access, so a later Claude Code release may need an update here.
 
 From a clone, at the Claude Code prompt:
 
@@ -34,18 +48,22 @@ The `main:` line is pinned under the prompt and refreshed after every main-agent
 | Field | Meaning |
 |---|---|
 | `tok 84.2k/200k (42%)` | Tokens of the main agent's last request against the model's context window |
-| `payload ~342 KB` | System prompt bytes plus the bytes of the messages the next request carries (after compaction). Tool definitions and the JSON envelope aren't counted, hence `~` |
-| `reqs` | API requests made by that agent |
-| `+tok/req mean, max` | How much the main context grew from one request to the next. A drop from compaction starts the count again instead of counting as negative growth |
+| `payload ~342 KB` | System prompt (`sys`) plus the messages (`msg`) the next request carries, after compaction. Tool definitions and the JSON envelope aren't counted, hence `~` |
+| `req` | API requests made by that agent |
+| `+tok/req ~1.7k` | Mean growth of the main context from one request to the next. A drop from compaction starts the count again instead of counting as negative growth |
+| `result` | Bytes of tool results handed back to the main agent |
+| `max +20.1k (Read)` | The biggest jump in main context between two requests, and the tool with the largest result just before it |
+| `largest` | The biggest single result of that tool |
+| `err` | Tool calls that returned an error. Hidden when there are none |
+| `time` | Time spent inside tool calls |
 | `tok X in / Y out` | For subagents: input tokens summed over all their requests, and output tokens. Each request re-sends the context, so this is volume sent, not context size |
-| `peak tok` | The largest single request of that run |
-| `msgs` | Bytes of the run's own conversation |
-| `returned` | Bytes of the report the run handed back to whoever started it |
+| `msg` | Bytes of the run's own conversation |
+| `returned` | Bytes of the report a run handed back to whoever started it |
 | `session` | Cost of the whole session, subagents included |
 
-Subagent runs from the current turn (or the turn that just ended) get a line each. Earlier runs are grouped by agent type. Subagents started by other subagents are indented under their parent. Claude Code's own background runs, such as compaction, are listed as `internal:`.
+`tools:` counts the main agent's tool calls only. Tools run by subagents are left out, because their results go into the subagent's context, not the main one.
 
-To expand the block, press `ctrl+x tab` to focus it, then `s`, or click it in fullscreen mode. Expanded, earlier runs get a line each and the max names the tool whose result caused it, e.g. `max 20.1k (Read)`.
+Collapsed, the block shows one summary line per section. Each section expands on its own key: press `ctrl+x tab` to focus the block, then `t` for tools or `s` for subagents, or click a key in fullscreen mode. A key only appears once its section has something to show. Expanded, tools are grouped by name and subagent runs get a line each. "Now" is the running turn, or the one that just ended. Subagents started by other subagents are indented under their parent. Claude Code's own background runs, such as compaction, are listed as `internal:`.
 
 `/clear` resets everything.
 
@@ -57,7 +75,7 @@ To keep a history, create the log file:
 touch ~/.claude/context-stats.jsonl
 ```
 
-If `CLAUDE_CONFIG_DIR` is set, the file goes in that directory instead. While the file exists, each main turn appends one JSON line with the main stats, usage and every subagent run. Delete the file to stop logging. Lines are appended with `tee -a`, so the log needs a POSIX system.
+If `CLAUDE_CONFIG_DIR` is set, the file goes in that directory instead. While the file exists, each main turn appends one JSON line with the main stats, usage, tool tallies and every subagent run. Delete the file to stop logging. Lines are appended with `tee -a`, so the log needs a POSIX system.
 
 ## Limits
 
