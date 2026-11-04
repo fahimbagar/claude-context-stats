@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: npx --yes @biomejs/biome@2.6.2 lint .
+
+  check:
+    name: validate and test (claude-code ${{ matrix.claude-code }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 2.1.309 is the release the mod API types were read from. The API is
+        # early access, so `latest` shows when a new release breaks the mod.
+        claude-code: ['2.1.309', latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: npm install -g @anthropic-ai/claude-code@${{ matrix.claude-code }}
+      - run: claude --version
+      - run: claude plugin validate --strict .
+      - run: claude plugin test .
