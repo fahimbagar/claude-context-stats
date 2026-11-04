@@ -37,14 +37,14 @@ export function mainLine(
     parts.push(payloadPart(main.systemBytes, main.msgsBytes))
   }
 
-  parts.push(`reqs ${main.reqs}`)
+  parts.push(`req ${main.reqs}`)
 
   if (main.growthCount > 0) {
     const mean = main.growthSum / main.growthCount
     const maxTool =
       showMaxTool && main.growthMaxTool !== null ? ` (${main.growthMaxTool})` : ''
     parts.push(
-      `+tok/req mean ${formatTokens(mean)}, max ${formatTokens(main.growthMax)}${maxTool}`,
+      `+tok/req ~${formatTokens(mean)}, max ${formatTokens(main.growthMax)}${maxTool}`,
     )
   }
 
@@ -56,7 +56,7 @@ function payloadPart(system: number | null, msgs: number | null): string {
   const total = (system ?? 0) + (msgs ?? 0)
   const show = (n: number | null) => (n === null ? 'n/a' : formatBytes(n))
 
-  return `payload ~${formatBytes(total)} (system ${show(system)} + msgs ${show(msgs)})`
+  return `payload ~${formatBytes(total)} (sys ${show(system)} + msg ${show(msgs)})`
 }
 
 function contextPart(usage: UsageSnapshot | null): string {
@@ -94,7 +94,7 @@ export function bandLines(
     const earlier = subagents.filter(run => run.turn !== main.turn)
 
     if (current.length > 0) {
-      lines.push('  this turn:', ...runLines(current))
+      lines.push('  now:', ...runLines(current))
     }
 
     if (earlier.length > 0) {
@@ -120,8 +120,8 @@ function subagentsLine(runs: readonly IdentifiedRun[]): string {
   return [
     `subagents: ${countRuns(runs)}`,
     volume(runs),
-    `msgs ${formatBytes(sum(runs, run => run.msgsBytes ?? 0))}`,
-    `returned to main ${formatBytes(sum(toMain, run => run.returnedBytes ?? 0))}`,
+    `msg ${formatBytes(sum(runs, run => run.msgsBytes ?? 0))}`,
+    `returned ${formatBytes(sum(toMain, run => run.returnedBytes ?? 0))}`,
   ].join(' | ')
 }
 
@@ -156,10 +156,10 @@ function runLines(runs: readonly IdentifiedRun[]): string[] {
 
   return ordered.map(({ run }, i) =>
     [
-      `${labels[i]?.padEnd(width)}   reqs ${run.reqs}`,
+      `${labels[i]?.padEnd(width)}   req ${run.reqs}`,
       `peak tok ${formatTokens(run.peakTokens)}`,
       tokensInOut(run.tokensIn, run.tokensOut),
-      `msgs ${optionalBytes(run.msgsBytes)}`,
+      `msg ${optionalBytes(run.msgsBytes)}`,
       `returned ${optionalBytes(run.returnedBytes)}`,
     ].join(' | '),
   )
@@ -179,7 +179,7 @@ function typeLines(runs: readonly IdentifiedRun[]): string[] {
   return [...byType.values()].map((group, i) =>
     [
       `${labels[i]?.padEnd(width)}   ${volume(group)}`,
-      `msgs ${formatBytes(sum(group, run => run.msgsBytes ?? 0))}`,
+      `msg ${formatBytes(sum(group, run => run.msgsBytes ?? 0))}`,
       `returned ${formatBytes(sum(group, run => run.returnedBytes ?? 0))}`,
     ].join(' | '),
   )
@@ -196,7 +196,7 @@ function runLabel(run: Run): string {
 
 function volume(runs: readonly Run[]): string {
   return [
-    `reqs ${sum(runs, run => run.reqs)}`,
+    `req ${sum(runs, run => run.reqs)}`,
     tokensInOut(sum(runs, run => run.tokensIn), sum(runs, run => run.tokensOut)),
   ].join(' | ')
 }

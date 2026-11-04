@@ -129,13 +129,13 @@ test('the band counts main and subagent requests and expands', async ($, on) => 
   const mainRow = await ui.find({ type: 'Text', text: /^main:/ })
 
   expect(mainRow?.text).toBe(
-    'main: tok 32k/200k (16%) | payload ~57 B (system n/a + msgs 57 B) | reqs 2 | +tok/req mean 20k, max 20k',
+    'main: tok 32k/200k (16%) | payload ~57 B (sys n/a + msg 57 B) | req 2 | +tok/req ~20k, max 20k',
   )
   expect((await ui.find({ type: 'Text', text: /^subagents:/ }))?.text).toBe(
-    'subagents: 1 run | reqs 2 | tok 81k in / 200 out | msgs 57 B | returned to main 5 B',
+    'subagents: 1 run | req 2 | tok 81k in / 200 out | msg 57 B | returned 5 B',
   )
   expect((await ui.find({ type: 'Text', text: /Explore/ }))?.text).toContain(
-    'reqs 2 | peak tok 41k',
+    'req 2 | peak tok 41k',
   )
   expect((await ui.find({ type: 'Text', text: /^session:/ }))?.text).toBe('session: $0.42')
 
