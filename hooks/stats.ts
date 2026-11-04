@@ -1,6 +1,6 @@
 import type { AgentInfo, ModelUsage, SessionMessage } from 'claude-code'
 
-import type { MainStats, Run, ToolResultSize } from '../types'
+import type { MainStats, Run, ToolResultSize, ToolTally } from '../types'
 
 export const EMPTY_MAIN: MainStats = {
   turn: 0,
@@ -60,6 +60,38 @@ function largestTool(toolResults: readonly ToolResultSize[]): string | null {
   }
 
   return largest?.tool ?? null
+}
+
+export function recordToolCall(
+  tallies: readonly ToolTally[],
+  turn: number,
+  tool: string,
+  bytes: number,
+  isError: boolean,
+  durationMs: number,
+): ToolTally[] {
+  const index = tallies.findIndex(t => t.turn === turn && t.tool === tool)
+  const tally = tallies[index] ?? {
+    turn,
+    tool,
+    calls: 0,
+    bytes: 0,
+    largest: 0,
+    errors: 0,
+    durationMs: 0,
+  }
+  const counted: ToolTally = {
+    ...tally,
+    calls: tally.calls + 1,
+    bytes: tally.bytes + bytes,
+    largest: Math.max(tally.largest, bytes),
+    errors: tally.errors + (isError ? 1 : 0),
+    durationMs: tally.durationMs + durationMs,
+  }
+
+  return index === -1
+    ? [...tallies, counted]
+    : tallies.map((t, i) => (i === index ? counted : t))
 }
 
 export function utf8Bytes(text: string): number {

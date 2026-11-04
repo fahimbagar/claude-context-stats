@@ -16,6 +16,17 @@ export type ToolResultSize = {
   bytes: number
 }
 
+// Main-loop calls of one tool during one main turn.
+export type ToolTally = {
+  turn: number
+  tool: string
+  calls: number
+  bytes: number
+  largest: number
+  errors: number
+  durationMs: number
+}
+
 export type Run = {
   // Order first seen, and the main turn it started in.
   seq: number
@@ -47,6 +58,7 @@ declare module 'claude-code' {
       runs: Record<string, Run>
       // Main-loop tool results since the last main request.
       pendingTools: ToolResultSize[]
+      tools: ToolTally[]
       usage: UsageSnapshot | null
       isExpanded: boolean
     }

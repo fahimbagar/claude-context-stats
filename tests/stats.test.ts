@@ -1,7 +1,12 @@
 import { expect, test } from 'claude-code/testing'
 
-import { formatBytes, formatTokens } from '../hooks/format'
-import { EMPTY_MAIN, recordMainRequest, returnedBytes } from '../hooks/stats'
+import { formatBytes, formatDuration, formatTokens } from '../hooks/format'
+import {
+  EMPTY_MAIN,
+  recordMainRequest,
+  recordToolCall,
+  returnedBytes,
+} from '../hooks/stats'
 
 test('token counts step up a unit instead of printing the base', () => {
   expect(formatTokens(850)).toBe('850')
@@ -16,6 +21,25 @@ test('byte sizes use binary units', () => {
   expect(formatBytes(2_355)).toBe('2.3 KB')
   expect(formatBytes(350_000)).toBe('342 KB')
   expect(formatBytes(1_900_000)).toBe('1.8 MB')
+})
+
+test('durations read in seconds, minutes, then hours', () => {
+  expect(formatDuration(400)).toBe('0.4s')
+  expect(formatDuration(8_240)).toBe('8.2s')
+  expect(formatDuration(12_400)).toBe('12s')
+  expect(formatDuration(72_000)).toBe('1m12s')
+  expect(formatDuration(3_720_000)).toBe('1h02m')
+})
+
+test('tool calls tally per tool per turn', () => {
+  let tallies = recordToolCall([], 1, 'Read', 500, false, 100)
+  tallies = recordToolCall(tallies, 1, 'Read', 2_000, true, 300)
+  tallies = recordToolCall(tallies, 2, 'Read', 10, false, 5)
+
+  expect(tallies).toEqual([
+    { turn: 1, tool: 'Read', calls: 2, bytes: 2_500, largest: 2_000, errors: 1, durationMs: 400 },
+    { turn: 2, tool: 'Read', calls: 1, bytes: 10, largest: 10, errors: 0, durationMs: 5 },
+  ])
 })
 
 test('growth skips the first request and a compaction drop', () => {

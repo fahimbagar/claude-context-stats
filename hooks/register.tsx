@@ -9,6 +9,7 @@ import {
   contextTokens,
   recordMainRequest,
   recordRunRequest,
+  recordToolCall,
   returnedBytes,
   utf8Bytes,
 } from './stats'
@@ -17,6 +18,7 @@ const main = atom({ plugin: 'context-stats', key: 'main' } as const, EMPTY_MAIN)
 const runs = atom({ plugin: 'context-stats', key: 'runs' } as const, {})
 const usage = atom({ plugin: 'context-stats', key: 'usage' } as const, null)
 const pendingTools = atom({ plugin: 'context-stats', key: 'pendingTools' } as const, [])
+const tools = atom({ plugin: 'context-stats', key: 'tools' } as const, [])
 const isExpanded = atom({ plugin: 'context-stats', key: 'isExpanded' } as const, false)
 
 export const register: Register = on => {
@@ -59,13 +61,20 @@ export const register: Register = on => {
   // The .catch hands back the settled call through next(e), so a failure in
   // this hook never reruns or blocks the tool.
   on('tool.call', async ($, e, next) => {
+    const startedAt = await $.clock.now()
     const called = await next(e)
 
     if (e.agentId === undefined && called.deny === undefined) {
-      await guard($, 'tool.call', () => {
+      await guard($, 'tool.call', async () => {
+        const durationMs = (await $.clock.now()) - startedAt
         const bytes = utf8Bytes(called.text ?? JSON.stringify(called.result ?? null))
+        const isError = called.isError === true
+        const { turn } = await read($, main)
 
-        return update($, pendingTools, results => [...results, { tool: e.tool, bytes }])
+        await update($, pendingTools, results => [...results, { tool: e.tool, bytes }])
+        await update($, tools, all =>
+          recordToolCall(all, turn, e.tool, bytes, isError, durationMs),
+        )
       })
     }
 
@@ -110,6 +119,7 @@ export const register: Register = on => {
         await update($, runs, () => ({}))
         await update($, usage, () => null)
         await update($, pendingTools, () => [])
+        await update($, tools, () => [])
         $.ui.status(undefined)
       })
     }
@@ -125,7 +135,13 @@ export const register: Register = on => {
     }
 
     const expanded = await read($, isExpanded)
-    const lines = bandLines(stats, await read($, runs), await read($, usage), expanded)
+    const lines = bandLines(
+      stats,
+      await read($, runs),
+      await read($, tools),
+      await read($, usage),
+      expanded,
+    )
     const { Box, Button, Text } = $.ui.resolve(e)
 
     return (
@@ -214,6 +230,7 @@ async function appendLog($: EngineInterface): Promise<void> {
     main: await read($, main),
     usage: await read($, usage),
     runs: await read($, runs),
+    tools: await read($, tools),
   })
   // $.fs has no append. tee -a opens the file O_APPEND, so lines from two
   // sessions sharing the log don't overwrite each other.

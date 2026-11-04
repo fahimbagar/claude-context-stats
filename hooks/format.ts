@@ -1,4 +1,4 @@
-import type { MainStats, Run, UsageSnapshot } from '../types'
+import type { MainStats, Run, ToolTally, UsageSnapshot } from '../types'
 
 export function formatTokens(n: number): string {
   return withUnit(n, 1000, ['', 'k', 'M', 'B'])
@@ -26,11 +26,27 @@ function roundForDisplay(value: number): number {
   return value >= 100 ? Math.round(value) : Number(value.toFixed(1))
 }
 
-export function mainLine(
-  main: MainStats,
-  usage: UsageSnapshot | null,
-  showMaxTool = false,
-): string {
+export function formatDuration(ms: number): string {
+  if (ms < 9_950) {
+    return `${(ms / 1000).toFixed(1)}s`
+  }
+
+  const seconds = Math.round(ms / 1000)
+
+  if (seconds < 60) {
+    return `${seconds}s`
+  }
+
+  const pad = (n: number) => String(n).padStart(2, '0')
+
+  if (seconds < 3600) {
+    return `${Math.floor(seconds / 60)}m${pad(seconds % 60)}s`
+  }
+
+  return `${Math.floor(seconds / 3600)}h${pad(Math.floor(seconds / 60) % 60)}m`
+}
+
+export function mainLine(main: MainStats, usage: UsageSnapshot | null): string {
   const parts = [`tok ${contextPart(usage)}`]
 
   if (main.systemBytes !== null || main.msgsBytes !== null) {
@@ -40,12 +56,7 @@ export function mainLine(
   parts.push(`req ${main.reqs}`)
 
   if (main.growthCount > 0) {
-    const mean = main.growthSum / main.growthCount
-    const maxTool =
-      showMaxTool && main.growthMaxTool !== null ? ` (${main.growthMaxTool})` : ''
-    parts.push(
-      `+tok/req ~${formatTokens(mean)}, max ${formatTokens(main.growthMax)}${maxTool}`,
-    )
+    parts.push(`+tok/req ~${formatTokens(main.growthSum / main.growthCount)}`)
   }
 
   return `main: ${parts.join(' | ')}`
@@ -76,10 +87,16 @@ const DESCRIPTION_WIDTH = 30
 export function bandLines(
   main: MainStats,
   runs: Readonly<Record<string, Run>>,
+  tools: readonly ToolTally[],
   usage: UsageSnapshot | null,
   isExpanded: boolean,
 ): string[] {
-  const lines = [mainLine(main, usage, isExpanded)]
+  const lines = [mainLine(main, usage)]
+
+  if (tools.length > 0) {
+    lines.push(toolsLine(main, tools))
+  }
+
   const all = Object.entries(runs)
     .map(([id, run]) => ({ ...run, id }))
     .sort((a, b) => a.seq - b.seq)
@@ -111,6 +128,30 @@ export function bandLines(
   }
 
   return lines
+}
+
+function toolsLine(main: MainStats, tools: readonly ToolTally[]): string {
+  const calls = sum(tools, t => t.calls)
+  const errors = sum(tools, t => t.errors)
+  const parts = [
+    `tools: ${calls === 1 ? '1 call' : `${calls} calls`}`,
+    `result ${formatBytes(sum(tools, t => t.bytes))}`,
+  ]
+
+  // The biggest jump in main context between two requests, and the tool
+  // whose result most likely caused it.
+  if (main.growthCount > 0) {
+    const cause = main.growthMaxTool === null ? '' : ` (${main.growthMaxTool})`
+    parts.push(`max +${formatTokens(main.growthMax)}${cause}`)
+  }
+
+  if (errors > 0) {
+    parts.push(`err ${errors}`)
+  }
+
+  parts.push(`time ${formatDuration(sum(tools, t => t.durationMs))}`)
+
+  return parts.join(' | ')
 }
 
 function subagentsLine(runs: readonly IdentifiedRun[]): string {
