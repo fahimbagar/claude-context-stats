@@ -42,6 +42,15 @@ From a clone, at the Claude Code prompt:
 /plugin install context-stats@context-stats
 ```
 
+Or from a shell:
+
+```sh
+claude plugin marketplace add /path/to/claude-context-stats
+claude plugin install context-stats@context-stats
+```
+
+Both install for every session (user scope). For one project only, add `--scope project` or `--scope local` to `claude plugin marketplace add`. Sessions that were already open pick the plugin up after `/reload-plugins`.
+
 A marketplace added from a folder is read in place: after pulling changes, run `/reload-plugins`.
 
 ## What you see
