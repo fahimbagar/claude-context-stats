@@ -70,7 +70,7 @@ export const register: Register = on => {
     }
 
     return called
-  }).catch(($, e, next) => next(e))
+  }).catch((_, e, next) => next(e))
 
   on('prompt.compose', async ($, e, next) => {
     const composed = await next(e)

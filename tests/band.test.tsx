@@ -44,6 +44,7 @@ async function complete($: Engine, turnId: string, agentId?: string) {
 test('the band counts main and subagent requests and expands', async ($, on) => {
   // Nothing sits beneath the plugin: these hooks stand for the engine.
   on('turn.start', (_, e) => ({ turnId: e.turnId }))
+  // biome-ignore lint/correctness/useYield: a turn.step hook must be a generator; this stub answers with no chunks
   on('turn.step', async function* (_, e) {
     return {
       turnId: e.turnId,
