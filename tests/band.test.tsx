@@ -142,7 +142,7 @@ test('the band counts main requests, tool calls and subagent runs', async ($, on
   const text = async (pattern: RegExp) => (await ui.find({ type: 'Text', text: pattern }))?.text
 
   expect(await text(/^main:/)).toBe(
-    'main: tok 32k/200k (16%) | payload ~57 B (sys n/a + msg 57 B) | req 2 | +tok/req ~20k',
+    'main: tok 32k/200k (16%) | msg 57 B | req 2 | +tok/req ~20k',
   )
   expect(await text(/^tools:/)).toBe(
     'tools: 1 call | result 78.1 KB | max +20k (Read) | time 0.1s',

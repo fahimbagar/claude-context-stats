@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { formatBytes, formatDuration, formatTokens } from '../hooks/format'
+import { formatBytes, formatDuration, formatTokens, mainLine } from '../hooks/format'
 import {
   EMPTY_MAIN,
   recordMainRequest,
@@ -21,6 +21,16 @@ test('byte sizes use binary units', () => {
   expect(formatBytes(2_355)).toBe('2.3 KB')
   expect(formatBytes(350_000)).toBe('342 KB')
   expect(formatBytes(1_900_000)).toBe('1.8 MB')
+})
+
+test('payload needs the system prompt size, else only msg shows', () => {
+  const usage = { tokens: 1_000, window: 200_000, percent: 1, costUsd: null }
+  const main = { ...EMPTY_MAIN, reqs: 1, msgsBytes: 2_048 }
+
+  expect(mainLine(main, usage)).toBe('main: tok 1k/200k (1%) | msg 2 KB | req 1')
+  expect(mainLine({ ...main, systemBytes: 1_024 }, usage)).toBe(
+    'main: tok 1k/200k (1%) | payload ~3 KB (sys 1 KB + msg 2 KB) | req 1',
+  )
 })
 
 test('durations read in seconds, minutes, then hours', () => {

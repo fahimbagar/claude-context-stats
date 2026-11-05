@@ -49,8 +49,12 @@ export function formatDuration(ms: number): string {
 export function mainLine(main: MainStats, usage: UsageSnapshot | null): string {
   const parts = [`tok ${contextPart(usage)}`]
 
-  if (main.systemBytes !== null || main.msgsBytes !== null) {
+  // With no system prompt size (another plugin handled prompt.compose before
+  // this one), the messages alone aren't a payload, so they're shown as msg.
+  if (main.systemBytes !== null) {
     parts.push(payloadPart(main.systemBytes, main.msgsBytes))
+  } else if (main.msgsBytes !== null) {
+    parts.push(`msg ${formatBytes(main.msgsBytes)}`)
   }
 
   parts.push(`req ${main.reqs}`)
@@ -63,11 +67,10 @@ export function mainLine(main: MainStats, usage: UsageSnapshot | null): string {
 }
 
 // "~" because tool schemas and the request's JSON envelope aren't counted.
-function payloadPart(system: number | null, msgs: number | null): string {
-  const total = (system ?? 0) + (msgs ?? 0)
-  const show = (n: number | null) => (n === null ? 'n/a' : formatBytes(n))
+function payloadPart(system: number, msgs: number | null): string {
+  const msgPart = msgs === null ? 'n/a' : formatBytes(msgs)
 
-  return `payload ~${formatBytes(total)} (sys ${show(system)} + msg ${show(msgs)})`
+  return `payload ~${formatBytes(system + (msgs ?? 0))} (sys ${formatBytes(system)} + msg ${msgPart})`
 }
 
 function contextPart(usage: UsageSnapshot | null): string {
