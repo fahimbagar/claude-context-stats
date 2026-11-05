@@ -28,6 +28,8 @@ const subagentsExpanded = atom(
   false,
 )
 
+const SECTION_LABEL = /^([a-z]+:)(.*)$/
+
 export const register: Register = on => {
   on('turn.start', async ($, e, next) => {
     const started = await next(e)
@@ -176,11 +178,27 @@ export const register: Register = on => {
         : []),
     ]
 
+    // Section lines open with their label ("tools: ..."); detail rows are
+    // indented and drawn dim. Colors are theme keys, so they follow the
+    // person's light or dark theme.
     return (
-      <Box flexDirection="column">
-        {lines.map(line => (
-          <Text wrap="truncate-end">{line}</Text>
-        ))}
+      <Box flexDirection="column" borderStyle="round" borderColor="subtle" paddingX={1}>
+        {lines.map(line => {
+          const section = SECTION_LABEL.exec(line)
+
+          return section === null ? (
+            <Text dimColor wrap="truncate-end">
+              {line}
+            </Text>
+          ) : (
+            <Text wrap="truncate-end">
+              <Text bold color="suggestion">
+                {section[1]}
+              </Text>
+              {section[2]}
+            </Text>
+          )
+        })}
         {toggles.length > 0 ? (
           <Box flexDirection="row" gap={3}>
             {toggles}

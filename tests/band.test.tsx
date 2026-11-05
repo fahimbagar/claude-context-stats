@@ -151,6 +151,10 @@ test('the band counts main requests, tool calls and subagent runs', async ($, on
     'subagents: 1 run | req 2 | tok 81k in / 200 out | msg 57 B | returned 5 B',
   )
   expect(await text(/^session:/)).toBe('session: $0.42')
+  expect((await ui.find({ type: 'Text', text: /^main:$/ }))?.props).toMatchObject({
+    bold: true,
+    color: 'suggestion',
+  })
 
   // Collapsed: summary lines only.
   expect(await text(/now:/)).toBeUndefined()
