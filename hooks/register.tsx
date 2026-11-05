@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, ModelUsage, Register } from 'claude-code'
 
 import type { UsageSnapshot } from '../types'
-import { bandLines, mainLine } from './format'
+import { bandLines } from './format'
 import {
   EMPTY_MAIN,
   applyConversation,
@@ -55,7 +55,7 @@ export const register: Register = on => {
             recordMainRequest(m, contextTokens(stepUsage), toolResults),
           )
           await update($, pendingTools, () => [])
-          await refreshStatus($)
+          await refreshUsage($)
         } else {
           await recordRun($, agentId, stepUsage)
         }
@@ -108,7 +108,7 @@ export const register: Register = on => {
       await measureConversation($, agentId)
 
       if (agentId === undefined) {
-        await refreshStatus($)
+        await refreshUsage($)
         await appendLog($)
       }
     })
@@ -127,7 +127,6 @@ export const register: Register = on => {
         await update($, usage, () => null)
         await update($, pendingTools, () => [])
         await update($, tools, () => [])
-        $.ui.status(undefined)
       })
     }
 
@@ -233,7 +232,7 @@ async function measureConversation(
   await update($, runs, all => applyConversation(all, agentId, bytes, returned))
 }
 
-async function refreshStatus($: EngineInterface): Promise<void> {
+async function refreshUsage($: EngineInterface): Promise<void> {
   const current = await $.session.usage()
   const snapshot: UsageSnapshot = {
     tokens: current.context.tokens ?? null,
@@ -243,7 +242,6 @@ async function refreshStatus($: EngineInterface): Promise<void> {
   }
 
   await update($, usage, () => snapshot)
-  $.ui.status(mainLine(await read($, main), snapshot))
 }
 
 // Opt-in: a line is written only when the file already exists.

@@ -57,7 +57,7 @@ A marketplace added from a folder is read in place: after pulling changes, run `
 
 ## What you see
 
-The `main:` line is pinned under the prompt and refreshed after every main-agent request. The full block sits above the prompt and updates as requests finish; byte counts update when a turn ends.
+The block sits above the prompt and updates as requests finish; byte counts update when a turn ends.
 
 | Field | Meaning |
 |---|---|

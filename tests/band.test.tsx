@@ -113,7 +113,6 @@ function stubEngine(on: On): unknown[] {
     logged.push(e)
     return { value: undefined }
   })
-  on('ui.status', () => ({ value: undefined }))
 
   return logged
 }
