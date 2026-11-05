@@ -62,7 +62,7 @@ The block sits above the prompt and updates as requests finish; byte counts upda
 | Field | Meaning |
 |---|---|
 | `tok 84.2k/200k (42%)` | Tokens of the main agent's last request against the model's context window |
-| `payload ~342 KB` | System prompt (`sys`) plus the messages (`msg`) the next request carries, after compaction. Tool definitions and the JSON envelope aren't counted, hence `~` |
+| `payload ~342 KB` | System prompt (`sys`) plus the messages (`msg`) the next request carries, after compaction. Tool definitions and the JSON envelope aren't counted, hence `~`. Shown as `msg 311 KB` alone when the system prompt size is unavailable (see Limits) |
 | `req` | API requests made by that agent |
 | `+tok/req ~1.7k` | Mean growth of the main context from one request to the next. A drop from compaction starts the count again instead of counting as negative growth |
 | `result` | Bytes of tool results handed back to the main agent |
@@ -94,6 +94,7 @@ If `CLAUDE_CONFIG_DIR` is set, the file goes in that directory instead. While th
 ## Limits
 
 - The payload figure is a lower bound on the HTTP request body. Measuring the exact body would need a logging proxy.
+- The system prompt size is read from the `prompt.compose` event. If another plugin handles that event before this one and doesn't pass it on, as an organization's security plugin such as `cc-plugin-sec-default` may, the size never arrives. The main line then shows `msg 311 KB` instead of `payload ~342 KB (sys 31 KB + msg 311 KB)`, since the messages alone aren't the whole payload.
 - The system prompt size comes from the last prompt Claude Code composed. If a subagent's system prompt is composed later, the main line may briefly show that size instead.
 - Only one plugin draws the band above the prompt, so another plugin that also draws there would be hidden while this one has data.
 
