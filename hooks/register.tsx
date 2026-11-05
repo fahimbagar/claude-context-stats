@@ -118,6 +118,16 @@ export const register: Register = on => {
     return completed
   })
 
+  // Earlier builds pinned a status line under the prompt. Claude Code keeps
+  // it until the plugin clears it, even across /reload-plugins, so clear it
+  // on every load.
+  on('session.start', async ($, e, next) => {
+    const started = await next(e)
+    $.ui.status(undefined)
+
+    return started
+  })
+
   // /clear starts a new conversation in the same process: start counting again.
   on('session.end', async ($, e, next) => {
     const ended = await next(e)
